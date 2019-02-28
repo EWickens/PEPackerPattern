@@ -1,0 +1,1 @@
+<b>Compare a section of bytes in multiple files, located after the entry point, to aid in the creation of packer detection yara rules</b>
