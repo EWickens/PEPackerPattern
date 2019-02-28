@@ -11,13 +11,43 @@ def main():
     args = parse_arguments()
 
     if args.filename is not None:
-        get_data(file, buffer_size, args)
+        get_data(args.filename, buffer_size)
+
+    if args.dir is not None:
+        files_dict = create_file_dictionary(args, buffer_size)
 
 
-def get_data(file, buffer_size, args):
-    file = args.filename
-    entry_point = get_entry_point(file, buffer_size)
-    hex_data = read_from_hex_offset(file, entry_point, buffer_size)
+
+def create_file_dictionary(args, buffer_size):
+    hash_list = os.listdir(args.dir)
+    dictionary = dict.fromkeys(hash_list, 0)
+
+    # print path to all filenames.
+    path_list = list()
+    for filename in hash_list:
+        path_list.append(os.path.join(args.dir, filename))
+
+    for filename in path_list:
+        try:
+
+            hex_data = get_data(filename, buffer_size)
+            temp_list = list(hex_data)
+
+            dictionary[filename] = temp_list
+        except:
+            pefile.PEFormatError
+
+    return dictionary
+
+
+def get_data(filename, buffer_size):
+    # split = file.split('/', 1)[-1]
+    print(filename)
+    entry_point = get_entry_point(filename)
+    hex_data = read_from_hex_offset(filename, entry_point, buffer_size)
+
+    return hex_data
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -41,19 +71,19 @@ def parse_arguments():
     return args
 
 
-def get_entry_point(file, buffer_size):
-    pe = pefile.PE(file)  # Takes the filename from command line argument and loads PE file
+def get_entry_point(filename):
+    pe = pefile.PE(filename)  # Takes the filename from command line argument and loads PE file
     entry_point = hex(pe.OPTIONAL_HEADER.AddressOfEntryPoint)
-
     return entry_point
 
-def read_from_hex_offset(file, hex_offset, buffer_size):
-    file = open(file)
+
+def read_from_hex_offset(filename, hex_offset, buffer_size):
+    filename = open(filename)
 
     offset = int(hex_offset, base=16)
-    file.seek(offset, 0)
+    filename.seek(offset, 0)
 
-    data = file.read(buffer_size)
+    hex_data = filename.read(buffer_size)
 
     return hex_data
 
