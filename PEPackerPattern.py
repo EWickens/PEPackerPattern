@@ -15,21 +15,26 @@ def main():
 
     if args.dir is not None:
         files_dict = create_file_dictionary(args, buffer_size)
+        check_data_for_matches(files_dict)
 
-
+def check_data_for_matches(files_dict):
+    for data in files_dict.items():
+        for hex in data:
+            if isinstance(hex, str) == True:
+                hex = hex.split('x', 1)[-1]
+        print(data)
 
 def create_file_dictionary(args, buffer_size):
     hash_list = os.listdir(args.dir)
-    dictionary = dict.fromkeys(hash_list, 0)
-
     # print path to all filenames.
     path_list = list()
     for filename in hash_list:
         path_list.append(os.path.join(args.dir, filename))
 
+
+    dictionary = dict.fromkeys(path_list, 0)
     for filename in path_list:
         try:
-
             hex_data = get_data(filename, buffer_size)
             temp_list = list(hex_data)
 
@@ -41,8 +46,6 @@ def create_file_dictionary(args, buffer_size):
 
 
 def get_data(filename, buffer_size):
-    # split = file.split('/', 1)[-1]
-    print(filename)
     entry_point = get_entry_point(filename)
     hex_data = read_from_hex_offset(filename, entry_point, buffer_size)
 
