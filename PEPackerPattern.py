@@ -17,15 +17,36 @@ def main():
     if args.dir is not None:
         files_dict = create_file_dictionary(args, buffer_size)
         # check_data_for_matches(files_dict)
+        round_robin(files_dict)
 
 
-def check_data_for_matches(files_dict):
+def round_robin(files_dict):
+    values = list(files_dict.values())
 
-    for value in files_dict.values():
-        value = binascii.unhexlify(value)
+    retvals = list()
+    for x in range(len(values)):
+
+        for y in range(x+1, len(values)):
+                retval = multiprocess_match(values[x], values[y])
+                if len(retval) > 0:
+                    retvals.append(retval)
+    occurence_check(retvals)
+
+def occurence_check(retvals):
+
+    retval_dict = dict.fromkeys(retvals, 0)
 
 
+def multiprocess_match(file1, file2):
+    retval = list()
 
+    if file1 != 0 and file2 != 0:
+        for x in range(len(file1)):
+            if file1[x] == file2[x]:
+                retval.append(file1[x])
+            else:
+                retval.append("0")
+    return retval
 
 def create_file_dictionary(args, buffer_size):
     temp_list = list()
@@ -51,7 +72,6 @@ def create_file_dictionary(args, buffer_size):
 
 def get_data(filename, buffer_size):
     entry_point = get_entry_point(filename)
-    print(entry_point)
     hex_data = read_from_hex_offset(filename, entry_point, buffer_size)
 
     return hex_data
@@ -88,10 +108,6 @@ def read_from_hex_offset(filename, hex_offset, buffer_size):
 
     hex_data = binascii.hexlify(data)
 
-    binary_data = binascii.unhexlify(hex_data)
-
-
-
     return hex_data
 
 
@@ -106,20 +122,12 @@ def get_entry_point(filename):
 
     actual_entry_point = ep_section.PointerToRawData + delta
 
-    # if pe.sections[0] == ep_section:
-    #     actual_entry_point = ep_section.PointerToRawData + delta
-    #
-    # else:
-    #     # EntryPointAddress-VirtualAddressEpSection = OFFSET of how far into section
-    #     actual_entry_point = ep_section.PointerToRawData + delta
-
     entry_point = hex(actual_entry_point)
     return entry_point
 
 
 def find_entry_point_section(pe, entry_point):
     for section in pe.sections:
-        print("Searching")
         if section.contains_rva(entry_point):
             return section
 
