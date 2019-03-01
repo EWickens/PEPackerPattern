@@ -30,11 +30,14 @@ def round_robin(files_dict):
                 retval = multiprocess_match(values[x], values[y])
                 if len(retval) > 0:
                     retvals.append(retval)
-    occurence_check(retvals)
+                    print(retval)
 
-def occurence_check(retvals):
+    # print(retvals)
+    # occurence_check(retvals)
 
-    retval_dict = dict.fromkeys(retvals, 0)
+# def occurence_check(retvals):
+
+    # retval_dict = dict.fromkeys(retvals, 0)
 
 
 def multiprocess_match(file1, file2):
@@ -45,7 +48,7 @@ def multiprocess_match(file1, file2):
             if file1[x] == file2[x]:
                 retval.append(file1[x])
             else:
-                retval.append("0")
+                retval.append(False)
     return retval
 
 def create_file_dictionary(args, buffer_size):
