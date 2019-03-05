@@ -2,12 +2,12 @@ import argparse
 import binascii
 import csv
 import os
-import sys
 import pefile
+from difflib import SequenceMatcher
 
 
 def main():
-    buffer_size = 40
+    buffer_size = 60
 
     args = parse_arguments()
 
@@ -17,39 +17,58 @@ def main():
     if args.dir is not None:
         files_dict = create_file_dictionary(args, buffer_size)
         # check_data_for_matches(files_dict)
-        round_robin(files_dict)
+        # round_robin(files_dict)
 
 
-def round_robin(files_dict):
-    values = list(files_dict.values())
+'''Uses round robin to iterate through each possible match without duplication of matches'''
 
-    retvals = list()
-    for x in range(len(values)):
+# def round_robin(files_dict):
+#     values = list(files_dict.values())
+#
+#     matches = list()
+#
+#     for x in range(len(values)):
+#
+#         for y in range(x + 1, len(values)):
+#             retdict = multiprocess_match(values[x], values[y], x, y)
+#             if len(retdict) > 0:
+#                 matches.append(retdict)
 
-        for y in range(x+1, len(values)):
-                retval = multiprocess_match(values[x], values[y])
-                if len(retval) > 0:
-                    retvals.append(retval)
-                    print(retval)
+'''Calculate the occurences of a file at a given index in a file'''  # TODO Implement this
 
-    # print(retvals)
-    # occurence_check(retvals)
+
+def calculate_occurences(files_dict, buffer_size):
+    total_dict = dict.fromkeys(files_dict.keys())
+
+
 
 # def occurence_check(retvals):
 
-    # retval_dict = dict.fromkeys(retvals, 0)
+# retval_dict = dict.fromkeys(retvals, 0)
 
 
-def multiprocess_match(file1, file2):
-    retval = list()
+''' Matches two files and returns a dictionary with which of the hex matches'''
+
+
+def multiprocess_match(file1, file2, q, e):
+    print("COMBINES: " + str(q) + " " + str(e))
+
+    retdict = {}
 
     if file1 != 0 and file2 != 0:
         for x in range(len(file1)):
-            if file1[x] == file2[x]:
-                retval.append(file1[x])
+            if file1[x] == file2[x]:  # Creates a list with index of number followed by data
+                y = str(x)
+                retdict.update({x: file1[x]})
+
             else:
-                retval.append(False)
-    return retval
+                retdict[x] = False
+
+    return retdict
+
+
+'''Creates a dictionary of all the hashes in the file with their appropriate hex data as the value'''
+
 
 def create_file_dictionary(args, buffer_size):
     temp_list = list()
@@ -77,8 +96,10 @@ def get_data(filename, buffer_size):
     entry_point = get_entry_point(filename)
     hex_data = read_from_hex_offset(filename, entry_point, buffer_size)
 
+    print(hex_data)
     return hex_data
 
+'''Parses the arguments provided on the command line'''
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -102,6 +123,9 @@ def parse_arguments():
     return args
 
 
+'''Reads in file from the given entry point'''
+
+
 def read_from_hex_offset(filename, hex_offset, buffer_size):
     filename = open(filename, 'rb')
     offset = int(hex_offset, base=16)
@@ -112,6 +136,9 @@ def read_from_hex_offset(filename, hex_offset, buffer_size):
     hex_data = binascii.hexlify(data)
 
     return hex_data
+
+
+'''Calculates the REAL entry point of a file using the formula shown below'''
 
 
 def get_entry_point(filename):
@@ -127,6 +154,9 @@ def get_entry_point(filename):
 
     entry_point = hex(actual_entry_point)
     return entry_point
+
+
+'''Finds and returns the section that contains the entry point'''
 
 
 def find_entry_point_section(pe, entry_point):
