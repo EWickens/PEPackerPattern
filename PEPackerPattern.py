@@ -1,14 +1,12 @@
 import argparse
 import binascii
-import csv
 import os
-import pefile
 from collections import Counter
-import numpy as np
+import pefile
 
 
 def main():
-    buffer_size = 60
+    buffer_size = 40
 
     args = parse_arguments()
 
@@ -18,11 +16,22 @@ def main():
     if args.dir is not None:
         files_dict = create_file_dictionary(args, buffer_size)
         # check_data_for_matches(files_dict)
-        round_robin(files_dict)
+        cluster_lists = round_robin(files_dict)
+        final_out = calculate_most_common_at_index(cluster_lists[0])
+        yara_output = format_function(final_out)
 
+        print("Your yara rule is:")
+        print(yara_output)
 
-def multiprocess_match(file1, file2):
-    retdict = {}
+def format_function(final_out):
+    yara_output = " "
+    for each in final_out:
+        yara_output += each.upper()
+        yara_output += each.upper()
+        yara_output += " "
+
+    return yara_output
+def match_function(file1, file2):
     counter = 0
     if file1 != 0 and file2 != 0:
         for x in range(0, 10):
@@ -47,11 +56,23 @@ def calculate_most_common_at_index(cluster_list):
         index_list = list(zip(*cluster_list))[x]  # TODO MAYBE ADD IN A FEATURE TO IGNORE THE RESULT IF
         # THE INDEX HAS A HIGHER DEGREE OF ENTROPY
 
-        a = Counter(index_list).most_common(1)[0][0] #TODO return a null if there is a difference of 1-2-3 between the first 1-2-3rd place bits
+        first = Counter(index_list).most_common(1)[0][0]
+        first_len = Counter(index_list).most_common(1)[0][1]#TODO return a null if there is a difference of 1-2-3 between the first 1-2-3rd place bits
+        second = Counter(index_list).most_common(2)[0][0]
+        second_len = Counter(index_list).most_common(2)[0][1]
+        third = Counter(index_list).most_common(3)[0][0]
+        third_len = Counter(index_list).most_common(3)[0][1]
 
+        num_clust = len(cluster_list)
+        thresh = 0.8
+        # Out of total occurrences if first is not a substantially high fraction then ignore it
+        if (first_len / num_clust) < thresh:
+            final_out.append("?")
 
-
-        final_out.append(a)
+        # Could also add in condition here that if first/second are the same then it appends asterix or develops new
+        # rule
+        else:
+            final_out.append(first)
 
     print(final_out)
     return final_out
@@ -72,28 +93,31 @@ def round_robin(files_dict):
             for y in range(x + 1, len(
                     values)):  # TODO DOUBLE CHECK THIS TO MAKE SURE ITS ITERATING THROUGH THE CORRECT BUFFER SIZE
 
-                if multiprocess_match(values[x], values[y]):
+                if match_function(values[x], values[y]):
 
-                    # First iteration   #TODO ADD IN REDUNDANCY SO THAT IF THE FIRST THREE CLUSTERS ARE NOT THE MAIN CLUSTER THAT THE BIGGEST AMOUNT OF MATCHES IS THE FIRST
-                    # TODO THIS COULD BE DONE BY CALLING LEN ON ALL OF THE CLUSTER_LISTS AND SORTING THEM BY THE HIGHEST AMOUNT OF FILES IN ONE LIST
+                    # First iteration   #TODO ADD IN REDUNDANCY SO THAT IF THE FIRST THREE CLUSTERS ARE NOT THE MAIN
+                    #  CLUSTER THAT THE BIGGEST AMOUNT OF MATCHES IS THE FIRST TODO THIS COULD BE DONE BY CALLING LEN
+                    #   ON ALL OF THE CLUSTER_LISTS AND SORTING THEM BY THE HIGHEST AMOUNT OF FILES IN ONE LIST
 
                     # remove Y from list so it's not processed again and add it to the main cluster
                     # Also add the index of the hash into the first cluster group
 
-                    if len(cluster_lists[amount_of_list]) != 0 and multiprocess_match(cluster_lists[amount_of_list][0],
+                    if len(cluster_lists[amount_of_list]) != 0 and match_function(cluster_lists[amount_of_list][0],
                                                                                       values[y]):
                         cluster_lists[amount_of_list].append(values[y])
 
                     elif len(cluster_lists[amount_of_list]) == 0:  # If its the first file of the loop
                         cluster_lists[amount_of_list].append(values[y])
 
-                elif not multiprocess_match(values[x], values[y]):
+                elif not match_function(values[x], values[y]):
                     continue
 
             values = [x for x in values if x not in cluster_lists[amount_of_list]]
 
     # print(calculate_most_common_at_index(cluster_listts[0]))
-    calculate_most_common_at_index(cluster_lists[0])
+
+    return cluster_lists
+
 
 
 # def occurence_check(retvals):
