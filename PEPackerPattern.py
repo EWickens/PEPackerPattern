@@ -17,29 +17,14 @@ def main():
     if args.dir is not None:
         files_dict = create_file_dictionary(args, buffer_size)
         # check_data_for_matches(files_dict)
-        # round_robin(files_dict)
+        round_robin(files_dict)
 
-
-'''Uses round robin to iterate through each possible match without duplication of matches'''
-
-# def round_robin(files_dict):
-#     values = list(files_dict.values())
-#
-#     matches = list()
-#
-#     for x in range(len(values)):
-#
-#         for y in range(x + 1, len(values)):
-#             retdict = multiprocess_match(values[x], values[y], x, y)
-#             if len(retdict) > 0:
-#                 matches.append(retdict)
 
 '''Calculate the occurences of a file at a given index in a file'''  # TODO Implement this
 
 
 def calculate_occurences(files_dict, buffer_size):
     total_dict = dict.fromkeys(files_dict.keys())
-
 
 
 # def occurence_check(retvals):
@@ -50,21 +35,62 @@ def calculate_occurences(files_dict, buffer_size):
 ''' Matches two files and returns a dictionary with which of the hex matches'''
 
 
-def multiprocess_match(file1, file2, q, e):
-    print("COMBINES: " + str(q) + " " + str(e))
-
+def multiprocess_match(file1, file2):
     retdict = {}
-
+    counter = 0
+    print(file1)
+    print(file2)
+    print(" ")
     if file1 != 0 and file2 != 0:
-        for x in range(len(file1)):
+        for x in range(0, 5):
             if file1[x] == file2[x]:  # Creates a list with index of number followed by data
-                y = str(x)
-                retdict.update({x: file1[x]})
+                counter += 1
+        print(counter)
+        if counter != 0 and counter % 5 == 0:
 
-            else:
-                retdict[x] = False
+            return True
 
-    return retdict
+        else:
+            return False
+
+
+'''Uses round robin to iterate through each possible match without duplication of matches'''
+
+
+def round_robin(files_dict):
+    values = list(files_dict.values())
+
+    # Might have to create an iterable cluster list here
+    cluster_lists = [[] for i in range(3)]
+
+    for amount_of_list in range(len(cluster_lists)):
+
+        for x in range(len(values)):
+            for y in range(x + 1, len(values)):
+
+                if multiprocess_match(values[x], values[y]):
+
+                    # First iteration   #TODO ADD IN REDUNDANCY SO THAT IF THE FIRST THREE CLUSTERS ARE NOT THE MAIN CLUSTER THAT THE BIGGEST AMOUNT OF MATCHES IS THE FIRST
+                    #TODO THIS COULD BE DONE BY CALLING LEN ON ALL OF THE CLUSTER_LISTS AND SORTING THEM BY THE HIGHEST AMOUNT OF FILES IN ONE LIST
+
+                    # remove Y from list so it's not processed again and add it to the main cluster
+                    # Also add the index of the hash into the first cluster group
+                    print(str(x) + ":" + str(y) + "Match!")
+
+                    if len(cluster_lists[amount_of_list]) != 0 and multiprocess_match(cluster_lists[amount_of_list][0], values[y]):
+                        cluster_lists[amount_of_list].append(values[y])
+
+                    elif len(cluster_lists[amount_of_list]) == 0: # If its the first file of the loop
+                        cluster_lists[amount_of_list].append(values[y])
+
+                elif not multiprocess_match(values[x], values[y]):
+                    # Leave it off til next sweep and then second_cluster is used
+                    print("No Match")
+
+            values = [x for x in values if x not in cluster_lists[amount_of_list]]
+
+    for each in cluster_lists[1]:
+        print(each)
 
 
 '''Creates a dictionary of all the hashes in the file with their appropriate hex data as the value'''
@@ -99,7 +125,9 @@ def get_data(filename, buffer_size):
     print(hex_data)
     return hex_data
 
+
 '''Parses the arguments provided on the command line'''
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
