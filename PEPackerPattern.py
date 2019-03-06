@@ -3,6 +3,7 @@ import binascii
 import os
 from collections import Counter
 import pefile
+from fuzzywuzzy import fuzz
 
 ''' I WILL TRY IMPROVE THE CLUSTERING TECHNIQUE BY USING FUZZYWUZZY'''
 
@@ -63,7 +64,6 @@ def print_function(cluster_lists,
             print("Num files in cluster: " + str(len(cluster_lists[each])) + "\n")
 
 
-
 def format_function(final_out):
     yara_output = "{ "
 
@@ -81,18 +81,13 @@ def format_function(final_out):
 
 
 def match_function(file1, file2):
-    counter = 0
-    if file1 != 0 and file2 != 0:
-        for x in range(0, 10):
-            if file1[x] == file2[x]:  # Creates a list with index of number followed by data
-                counter += 1
-        if counter != 0 and counter % 5 == 0:
+    val = fuzz.ratio(file1, file2)
+    if val > 80:
+        print(str(True))
+        return True
 
-            return True
-
-        else:
-            return False
-
+    else:
+        return False
 
 
 '''Calculate the occurences of a file at a given index in a file'''  # TODO Implement this
@@ -102,19 +97,12 @@ def calculate_most_common_at_index(cluster_list):
     final_out = list()
     index_list = list()
 
-
-
     for x in range(len(cluster_list[0])):
         index_list = list(zip(*cluster_list))[x]  # TODO MAYBE ADD IN A FEATURE TO IGNORE THE RESULT IF
         # THE INDEX HAS A HIGHER DEGREE OF ENTROPY
 
         first = Counter(index_list).most_common(1)[0][0]
-        first_len = Counter(index_list).most_common(1)[0][
-            1]  # TODO return a null if there is a difference of 1-2-3 between the first 1-2-3rd place bits
-        second = Counter(index_list).most_common(2)[0][0]
-        second_len = Counter(index_list).most_common(2)[0][1]
-        third = Counter(index_list).most_common(3)[0][0]
-        third_len = Counter(index_list).most_common(3)[0][1]
+        first_len = Counter(index_list).most_common(1)[0][1]
 
         num_clust = len(cluster_list)
         thresh = 0.8
@@ -147,11 +135,6 @@ def round_robin(files_dict):
 
                 if match_function(values[x], values[y]):
 
-                    # First iteration   #TODO ADD IN REDUNDANCY SO THAT IF THE FIRST THREE CLUSTERS ARE NOT THE MAIN
-                    #  CLUSTER THAT THE BIGGEST AMOUNT OF MATCHES IS THE FIRST TODO THIS COULD BE DONE BY CALLING LEN
-                    #   ON ALL OF THE CLUSTER_LISTS AND SORTING THEM BY THE HIGHEST AMOUNT OF FILES IN ONE LIST
-
-
                     if len(cluster_lists[amount_of_list]) != 0 and match_function(cluster_lists[amount_of_list][0],
                                                                                   values[y]):
                         cluster_lists[amount_of_list].append(values[y])
@@ -162,17 +145,9 @@ def round_robin(files_dict):
                 elif not match_function(values[x], values[y]):
                     continue
 
-
             values = [x for x in values if x not in cluster_lists[amount_of_list]]
 
-    # print(calculate_most_common_at_index(cluster_listts[0]))
-
     return cluster_lists
-
-
-# def occurence_check(retvals):
-
-# retval_dict = dict.fromkeys(retvals, 0)
 
 
 ''' Matches two files and returns a dictionary with which of the hex matches'''
@@ -192,10 +167,10 @@ def create_file_dictionary(args, buffer_size):
     for filename in path_list:
         try:
             hex_data = get_data(filename, buffer_size)
-            if hex_data is not None:
-                temp_list = list(hex_data)
+            # if hex_data is not None:
+            #     temp_list = list(hex_data)
 
-            dictionary[filename] = temp_list
+            dictionary[filename] = hex_data
         except pefile.PEFormatError:
             continue
 
