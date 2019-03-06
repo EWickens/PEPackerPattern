@@ -4,35 +4,69 @@ import os
 from collections import Counter
 import pefile
 
+''' I WILL TRY IMPROVE THE CLUSTERING TECHNIQUE BY USING FUZZYWUZZY'''
 
 def main():
     buffer_size = 40
+    num_clusters = 3
 
+    # TODO ADD IN ARGUMENT FOR HOW MANY CLUSTERS TO DISPLAY
+    print("=========================================================================================")
+    print("                 PEPacker YARA Rule Generator - USE WITH CAUTION!")
+    print("=========================================================================================")
+    print("\tThis Yara rule generator takes the initial first 40 bytes after the Entry Point of a PE file")
+    print("\tIt then clusters these Hex Strings in similar clusters, and if a character repeatedly appears")
+    print("\tat a given index in over 80% of that cluster it will generate a rule from this data")
+    print("\tLarger datasets are definitely preferable, I'll add functionality to allow the user to adjust the weights")
+    print("=========================================================================================")
     args = parse_arguments()
 
-    if args.filename is not None:
-        get_data(args.filename, buffer_size)
-
     if args.dir is not None:
+        print("\tProcessing data after entry points...\n")
         files_dict = create_file_dictionary(args, buffer_size)
         # check_data_for_matches(files_dict)
         cluster_lists = round_robin(files_dict)
-        final_out = calculate_most_common_at_index(cluster_lists[0])
-        yara_output = format_function(final_out)
+        print_function(cluster_lists, num_clusters)
+    else:
+        print("A directory must be specified for this tool to run, please ensure you have a large enough dataset")
+        return
 
-        print("Your yara rule is:")
-        print(yara_output)
+def print_function(cluster_lists,
+                   num_clusters):  # TODO IF SPECIFIED CLUSTERS RUN OVER NUM_CLUSTERS IT ONLY DISPLAYS AMOUNT OF CLUSTERS
 
-def print_function()
+    for each in range(num_clusters):
+        if len(cluster_lists[each]) > 4:
+            final_out = calculate_most_common_at_index(cluster_lists[each])
+            yara_output = format_function(final_out)
+            print("=========================================================================================")
+            print("Cluster " + str(each + 1) + " Generated Yara Rule")
+            if len(cluster_lists[each]) < 10:
+                print("Cluster size under 10 files, might want to increase for increased efficacy")
+            print("=========================================================================================")
+            print("Num files in cluster: " + str(len(cluster_lists[each])) + "\n")
+            print(yara_output + "\n")
+        else:
+            print("=========================================================================================")
+            print("Cluster " + str(each + 1) + " was not big enough to create a rule with any accuracy")
+            print("=========================================================================================")
+            print("Num files in cluster: " + str(len(cluster_lists[each]))+ "\n")
+
+
 def format_function(final_out):
-    yara_output = " "
+    yara_output = "{ "
+
     for each in range(0, len(final_out), 2):
         yara_output += final_out[each].upper()
-        yara_output += final_out[each+1].upper()
-        # yara_output += each.upper()
+        yara_output += final_out[each + 1].upper()
         yara_output += " "
 
+    yara_output += '}'
     return yara_output
+
+
+'''Currently this tries to match the first 10 bytes of a file to determine clustering
+    I think this is a poor way to cluster and will try to use fuzzywuzzy to replace this function for better clustering'''
+
 def match_function(file1, file2):
     counter = 0
     if file1 != 0 and file2 != 0:
@@ -59,7 +93,8 @@ def calculate_most_common_at_index(cluster_list):
         # THE INDEX HAS A HIGHER DEGREE OF ENTROPY
 
         first = Counter(index_list).most_common(1)[0][0]
-        first_len = Counter(index_list).most_common(1)[0][1]#TODO return a null if there is a difference of 1-2-3 between the first 1-2-3rd place bits
+        first_len = Counter(index_list).most_common(1)[0][
+            1]  # TODO return a null if there is a difference of 1-2-3 between the first 1-2-3rd place bits
         second = Counter(index_list).most_common(2)[0][0]
         second_len = Counter(index_list).most_common(2)[0][1]
         third = Counter(index_list).most_common(3)[0][0]
@@ -76,7 +111,6 @@ def calculate_most_common_at_index(cluster_list):
         else:
             final_out.append(first)
 
-    print(final_out)
     return final_out
 
 
@@ -105,7 +139,7 @@ def round_robin(files_dict):
                     # Also add the index of the hash into the first cluster group
 
                     if len(cluster_lists[amount_of_list]) != 0 and match_function(cluster_lists[amount_of_list][0],
-                                                                                      values[y]):
+                                                                                  values[y]):
                         cluster_lists[amount_of_list].append(values[y])
 
                     elif len(cluster_lists[amount_of_list]) == 0:  # If its the first file of the loop
@@ -119,7 +153,6 @@ def round_robin(files_dict):
     # print(calculate_most_common_at_index(cluster_listts[0]))
 
     return cluster_lists
-
 
 
 # def occurence_check(retvals):
@@ -158,7 +191,7 @@ def get_data(filename, buffer_size):
     entry_point = get_entry_point(filename)
     hex_data = read_from_hex_offset(filename, entry_point, buffer_size)
 
-    print(hex_data)
+    print("\t" + hex_data)
     return hex_data
 
 
@@ -169,8 +202,6 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
         description="Compare a section of bytes in multiple files, located after the entry point, to aid in the creation of packer detection yara rules")
 
-    parser.add_argument("-f", "--file", dest="filename",
-                        help="Specify file to be scanned", metavar="<file>")
     parser.add_argument("-b", "--buffer", dest="buffer",
                         help="Specifies how many 0's to look for default is - Default is 40 bytes",
                         # TODO Determine correct buffer size
