@@ -6,42 +6,53 @@ import pefile
 
 ''' I WILL TRY IMPROVE THE CLUSTERING TECHNIQUE BY USING FUZZYWUZZY'''
 
-def main():
-    buffer_size = 40
-    num_clusters = 3
 
-    # TODO ADD IN ARGUMENT FOR HOW MANY CLUSTERS TO DISPLAY
+def main():
+    args = parse_arguments()
+    buffer_size = 40
+
+    if args.num_clusters is not None:
+        num_clusters = int(args.num_clusters)
+    else:
+        num_clusters = 3
+
     print("=========================================================================================")
     print("                 PEPacker YARA Rule Generator - USE WITH CAUTION!")
     print("=========================================================================================")
     print("\tThis Yara rule generator takes the initial first 40 bytes after the Entry Point of a PE file")
     print("\tIt then clusters these Hex Strings in similar clusters, and if a character repeatedly appears")
-    print("\tat a given index in over 80% of that cluster it will generate a rule from this data")
+    print(
+        "\tat a given index in over 80% of that cluster it will generate a rule from this data for to generate our own")
+    print("\tYARA rules if we know its packed with a certain packer")
     print("\tLarger datasets are definitely preferable, I'll add functionality to allow the user to adjust the weights")
     print("=========================================================================================")
-    args = parse_arguments()
 
     if args.dir is not None:
         print("\tProcessing data after entry points...\n")
         files_dict = create_file_dictionary(args, buffer_size)
-        # check_data_for_matches(files_dict)
         cluster_lists = round_robin(files_dict)
         print_function(cluster_lists, num_clusters)
     else:
         print("A directory must be specified for this tool to run, please ensure you have a large enough dataset")
         return
 
+
 def print_function(cluster_lists,
-                   num_clusters):  # TODO IF SPECIFIED CLUSTERS RUN OVER NUM_CLUSTERS IT ONLY DISPLAYS AMOUNT OF CLUSTERS
+                   num_clusters):
+    cluster_lists.sort(key=len, reverse=True)
+
+    for x in range(len(cluster_lists)):
+        print(len(cluster_lists[x]))
 
     for each in range(num_clusters):
+
         if len(cluster_lists[each]) > 4:
             final_out = calculate_most_common_at_index(cluster_lists[each])
             yara_output = format_function(final_out)
-            print("=========================================================================================")
+            print("\n=========================================================================================")
             print("Cluster " + str(each + 1) + " Generated Yara Rule")
             if len(cluster_lists[each]) < 10:
-                print("Cluster size under 10 files, might want to increase for increased efficacy")
+                print("Cluster size under 10 files, might want to increase size of dataset for increased efficacy")
             print("=========================================================================================")
             print("Num files in cluster: " + str(len(cluster_lists[each])) + "\n")
             print(yara_output + "\n")
@@ -49,7 +60,8 @@ def print_function(cluster_lists,
             print("=========================================================================================")
             print("Cluster " + str(each + 1) + " was not big enough to create a rule with any accuracy")
             print("=========================================================================================")
-            print("Num files in cluster: " + str(len(cluster_lists[each]))+ "\n")
+            print("Num files in cluster: " + str(len(cluster_lists[each])) + "\n")
+
 
 
 def format_function(final_out):
@@ -67,6 +79,7 @@ def format_function(final_out):
 '''Currently this tries to match the first 10 bytes of a file to determine clustering
     I think this is a poor way to cluster and will try to use fuzzywuzzy to replace this function for better clustering'''
 
+
 def match_function(file1, file2):
     counter = 0
     if file1 != 0 and file2 != 0:
@@ -81,12 +94,15 @@ def match_function(file1, file2):
             return False
 
 
+
 '''Calculate the occurences of a file at a given index in a file'''  # TODO Implement this
 
 
 def calculate_most_common_at_index(cluster_list):
     final_out = list()
     index_list = list()
+
+
 
     for x in range(len(cluster_list[0])):
         index_list = list(zip(*cluster_list))[x]  # TODO MAYBE ADD IN A FEATURE TO IGNORE THE RESULT IF
@@ -135,8 +151,6 @@ def round_robin(files_dict):
                     #  CLUSTER THAT THE BIGGEST AMOUNT OF MATCHES IS THE FIRST TODO THIS COULD BE DONE BY CALLING LEN
                     #   ON ALL OF THE CLUSTER_LISTS AND SORTING THEM BY THE HIGHEST AMOUNT OF FILES IN ONE LIST
 
-                    # remove Y from list so it's not processed again and add it to the main cluster
-                    # Also add the index of the hash into the first cluster group
 
                     if len(cluster_lists[amount_of_list]) != 0 and match_function(cluster_lists[amount_of_list][0],
                                                                                   values[y]):
@@ -147,6 +161,7 @@ def round_robin(files_dict):
 
                 elif not match_function(values[x], values[y]):
                     continue
+
 
             values = [x for x in values if x not in cluster_lists[amount_of_list]]
 
@@ -208,10 +223,8 @@ def parse_arguments():
                         metavar="<buffSize>")
     parser.add_argument("-d", "--dir", metavar="<dir>",
                         help="Specify directory of files to scan")
-    parser.add_argument("-i", "--inputcsv", metavar="<path>",
-                        help="Specifies input CSV ")
-    parser.add_argument("-o", "--outputcsv", metavar="<path>",
-                        help="Specifies output CSV ")
+    parser.add_argument("-n", "--numberofclusters", dest="num_clusters", metavar="<num>",
+                        help="Specify the amount of clusters to display - default is 3")
 
     args = parser.parse_args()
 
