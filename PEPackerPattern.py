@@ -5,17 +5,9 @@ from collections import Counter
 import pefile
 from fuzzywuzzy import fuzz
 
-''' I WILL TRY IMPROVE THE CLUSTERING TECHNIQUE BY USING FUZZYWUZZY'''
-
-
 def main():
     args = parse_arguments()
     buffer_size = 40
-
-    if args.num_clusters is not None:
-        num_clusters = int(args.num_clusters)
-    else:
-        num_clusters = 3
 
     print("=========================================================================================")
     print("                 PEPacker YARA Rule Generator - USE WITH CAUTION!")
@@ -32,21 +24,17 @@ def main():
         print("\tProcessing data after entry points...\n")
         files_dict = create_file_dictionary(args, buffer_size)
         cluster_lists = round_robin(files_dict)
-        print_function(cluster_lists, num_clusters)
+        print_function(cluster_lists, len(files_dict))
     else:
         print("A directory must be specified for this tool to run, please ensure you have a large enough dataset")
         return
 
 
-def print_function(cluster_lists,
-                   num_clusters):
-    cluster_lists.sort(key=len, reverse=True)
-
-    for x in range(len(cluster_lists)):
-        print(len(cluster_lists[x]))
-
-    for each in range(num_clusters):
-
+def print_function(cluster_lists, overall_length):
+    est_covered = 0
+    total_files = 0
+    for each in range(len(cluster_lists)):
+        total_files += len(cluster_lists[each])
         if len(cluster_lists[each]) > 4:
             final_out = calculate_most_common_at_index(cluster_lists[each])
             yara_output = format_function(final_out)
@@ -57,11 +45,16 @@ def print_function(cluster_lists,
             print("=========================================================================================")
             print("Num files in cluster: " + str(len(cluster_lists[each])) + "\n")
             print(yara_output + "\n")
+            est_covered += len(cluster_lists[each])
         else:
             print("=========================================================================================")
             print("Cluster " + str(each + 1) + " was not big enough to create a rule with any accuracy")
             print("=========================================================================================")
             print("Num files in cluster: " + str(len(cluster_lists[each])) + "\n")
+
+    print("Total files given as dataset:" + str(overall_length))
+    print("Total files that were in the top 10 cluster: " + str(total_files))
+    print("Estimated files covered by generated rules: " + str(est_covered))
 
 
 def format_function(final_out):
@@ -80,15 +73,16 @@ def format_function(final_out):
     I think this is a poor way to cluster and will try to use fuzzywuzzy to replace this function for better clustering'''
 
 
-def match_function(file1, file2):
-    val = fuzz.ratio(file1, file2)
-    if val > 80:
-        print(str(True))
-        return True
+def match_function(file1, file2): #TODO ADD IN CMD LINE VARIABLE TO ADJUST THE SIMILARITY RATIO
+    if file1 != 0 and file2 != 0:
+        val = fuzz.ratio(file1, file2)
+        if val > 70:
+            return True
 
+        else:
+            return False
     else:
-        return False
-
+        return
 
 '''Calculate the occurences of a file at a given index in a file'''  # TODO Implement this
 
@@ -105,7 +99,7 @@ def calculate_most_common_at_index(cluster_list):
         first_len = Counter(index_list).most_common(1)[0][1]
 
         num_clust = len(cluster_list)
-        thresh = 0.8
+        thresh = 0.90
         # Out of total occurrences if first is not a substantially high fraction then ignore it
         if (first_len / num_clust) < thresh:
             final_out.append("?")
@@ -125,7 +119,7 @@ def round_robin(files_dict):
     values = list(files_dict.values())
 
     # Might have to create an iterable cluster list here
-    cluster_lists = [[] for i in range(3)]
+    cluster_lists = [[] for i in range(50)]
 
     for amount_of_list in range(len(cluster_lists)):
 
@@ -147,7 +141,14 @@ def round_robin(files_dict):
 
             values = [x for x in values if x not in cluster_lists[amount_of_list]]
 
-    return cluster_lists
+    cluster_lists.sort(key=len, reverse=True)
+
+    ret_list = list()
+    for x in range(len(cluster_lists)):
+        if len(cluster_lists[x]) > 2:
+            ret_list.append(cluster_lists[x])
+            print(len(cluster_lists[x]))
+    return ret_list
 
 
 ''' Matches two files and returns a dictionary with which of the hex matches'''
@@ -167,10 +168,8 @@ def create_file_dictionary(args, buffer_size):
     for filename in path_list:
         try:
             hex_data = get_data(filename, buffer_size)
-            # if hex_data is not None:
-            #     temp_list = list(hex_data)
-
-            dictionary[filename] = hex_data
+            if hex_data is not None:
+                dictionary[filename] = hex_data
         except pefile.PEFormatError:
             continue
 
@@ -198,9 +197,6 @@ def parse_arguments():
                         metavar="<buffSize>")
     parser.add_argument("-d", "--dir", metavar="<dir>",
                         help="Specify directory of files to scan")
-    parser.add_argument("-n", "--numberofclusters", dest="num_clusters", metavar="<num>",
-                        help="Specify the amount of clusters to display - default is 3")
-
     args = parser.parse_args()
 
     return args
