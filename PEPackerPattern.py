@@ -23,11 +23,13 @@ def main():
         print("Your yara rule is:")
         print(yara_output)
 
+def print_function()
 def format_function(final_out):
     yara_output = " "
-    for each in final_out:
-        yara_output += each.upper()
-        yara_output += each.upper()
+    for each in range(0, len(final_out), 2):
+        yara_output += final_out[each].upper()
+        yara_output += final_out[each+1].upper()
+        # yara_output += each.upper()
         yara_output += " "
 
     return yara_output
