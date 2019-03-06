@@ -5,6 +5,7 @@ from collections import Counter
 import pefile
 from fuzzywuzzy import fuzz
 
+
 def main():
     args = parse_arguments()
     buffer_size = 40
@@ -28,6 +29,9 @@ def main():
     else:
         print("A directory must be specified for this tool to run, please ensure you have a large enough dataset")
         return
+
+
+'''Prints out the cluster information'''
 
 
 def print_function(cluster_lists, overall_length):
@@ -57,6 +61,9 @@ def print_function(cluster_lists, overall_length):
     print("Estimated files covered by generated rules: " + str(est_covered))
 
 
+'''Formats the Yara rule for output'''
+
+
 def format_function(final_out):
     yara_output = "{ "
 
@@ -69,14 +76,19 @@ def format_function(final_out):
     return yara_output
 
 
-'''Currently this tries to match the first 10 bytes of a file to determine clustering
-    I think this is a poor way to cluster and will try to use fuzzywuzzy to replace this function for better clustering'''
+'''Uses Fuzzywuzzy library to get a partial ratio to determine how alike two hex strings are'''
 
 
-def match_function(file1, file2): #TODO ADD IN CMD LINE VARIABLE TO ADJUST THE SIMILARITY RATIO
+def match_function(file1, file2):  # TODO ADD IN CMD LINE VARIABLE TO ADJUST THE SIMILARITY RATIO
+    thresh = 70
+
+    # If both files aren't blank
     if file1 != 0 and file2 != 0:
+        # Fuzzywuzzy the two together to determine the ratio of similarity between the two
         val = fuzz.ratio(file1, file2)
-        if val > 70:
+
+        # if the fuzzywuzzy ratio is greater than the threshold return true
+        if val > thresh:
             return True
 
         else:
@@ -84,31 +96,36 @@ def match_function(file1, file2): #TODO ADD IN CMD LINE VARIABLE TO ADJUST THE S
     else:
         return
 
-'''Calculate the occurences of a file at a given index in a file'''  # TODO Implement this
+
+'''Calculate the occurences of a file at a given index in a file and return the list'''
 
 
 def calculate_most_common_at_index(cluster_list):
     final_out = list()
-    index_list = list()
 
     for x in range(len(cluster_list[0])):
-        index_list = list(zip(*cluster_list))[x]  # TODO MAYBE ADD IN A FEATURE TO IGNORE THE RESULT IF
-        # THE INDEX HAS A HIGHER DEGREE OF ENTROPY
+        index_list = list(zip(*cluster_list))[x]  # TODO | MAYBE ADD IN A FEATURE TO IGNORE THE RESULT IF
+        # TODO | THE INDEX HAS A HIGHER DEGREE OF ENTROPY
 
+        # First = Most common character at a given position
         first = Counter(index_list).most_common(1)[0][0]
+        # Amount of times first occurs
         first_len = Counter(index_list).most_common(1)[0][1]
 
-        num_clust = len(cluster_list)
+        # Length of cluster
+        clust_len = len(cluster_list)
+
+        # Threshold - If it doesn't occur in 90% of the cluster then mark it as ?
         thresh = 0.90
         # Out of total occurrences if first is not a substantially high fraction then ignore it
-        if (first_len / num_clust) < thresh:
+        if (first_len / clust_len) < thresh:
             final_out.append("?")
 
-        # Could also add in condition here that if first/second are the same then it appends asterix or develops new
-        # rule
+        # If it occurs > threshold then append the character here
         else:
             final_out.append(first)
 
+    # Return the list of most common characters
     return final_out
 
 
@@ -119,7 +136,7 @@ def round_robin(files_dict):
     values = list(files_dict.values())
 
     # Might have to create an iterable cluster list here
-    cluster_lists = [[] for i in range(50)]
+    cluster_lists = [[] for i in range(15)]
 
     for amount_of_list in range(len(cluster_lists)):
 
@@ -157,14 +174,20 @@ def round_robin(files_dict):
 
 
 def create_file_dictionary(args, buffer_size):
-    temp_list = list()
+    # Gets a list of all the files in the directory
     hash_list = os.listdir(args.dir)
+
     # Print path to all filenames.
     path_list = list()
+
+    # Appends the directory name to the filename for the next step
     for filename in hash_list:
         path_list.append(os.path.join(args.dir, filename))
 
     dictionary = dict.fromkeys(path_list, 0)
+
+    # Gets the data from every file in the directory and creates a dictionary
+    # Filename is Key and Data is value
     for filename in path_list:
         try:
             hex_data = get_data(filename, buffer_size)
@@ -174,6 +197,9 @@ def create_file_dictionary(args, buffer_size):
             continue
 
     return dictionary
+
+
+'''get_data function to tidy up code a bit'''
 
 
 def get_data(filename, buffer_size):
@@ -187,13 +213,13 @@ def get_data(filename, buffer_size):
 '''Parses the arguments provided on the command line'''
 
 
+# TODO Add in threshold weight arguments
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description="Compare a section of bytes in multiple files, located after the entry point, to aid in the creation of packer detection yara rules")
 
     parser.add_argument("-b", "--buffer", dest="buffer",
                         help="Specifies how many 0's to look for default is - Default is 40 bytes",
-                        # TODO Determine correct buffer size
                         metavar="<buffSize>")
     parser.add_argument("-d", "--dir", metavar="<dir>",
                         help="Specify directory of files to scan")
