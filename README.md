@@ -1,8 +1,10 @@
 <b>Compare a section of bytes in multiple files, located after the entry point, to aid in the creation of packer detection yara rules</b>
 
 This Yara rule generator takes the initial first 40 bytes after the Entry Point of a PE file, it then clusters these Hex Strings in similar clusters, and if a character repeatedly appears at a given index in over 90% (Changeable value) of that cluster it will generate a rule from this data for to generate YARA rules if we know its packed with a certain packer. Larger datasets are definitely preferable, the default character threshold is 90% and the default string comparison threshold is 70%
-```usage: PEPackerPattern.py [-h] [-b <buffSize>] [-d <dir>] [-ct <1-100>]
-                          [-st <1-100>]
+
+
+```
+usage: PEPackerPattern.py [-h] [-b <buffSize>] [-d <dir>] [-ct <1-100>] [-st <1-100>]
 
 Compare a section of bytes in multiple files, located after the entry point,
 to aid in the creation of packer detection yara rules
