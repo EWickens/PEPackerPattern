@@ -147,7 +147,6 @@ def calculate_most_common_at_index(cluster_list, char_match_thresh):
 
 def round_robin(files_dict, string_match_thresh):
     values = list(files_dict.values())
-
     # Might have to create an iterable cluster list here
     cluster_lists = [[] for i in range(15)]
 
@@ -155,7 +154,7 @@ def round_robin(files_dict, string_match_thresh):
 
         for x in range(len(values)):
             for y in range(x + 1, len(
-                    values)):  # TODO DOUBLE CHECK THIS TO MAKE SURE ITS ITERATING THROUGH THE CORRECT BUFFER SIZE
+                    values)):
 
                 if match_function(values[x], values[y], string_match_thresh):
 
@@ -225,8 +224,6 @@ def get_data(filename, buffer_size):
 
 '''Parses the arguments provided on the command line'''
 
-
-# TODO Add in threshold weight arguments
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description="Compare a section of bytes in multiple files, located after the entry point, to aid in the creation of packer detection yara rules")
@@ -234,14 +231,16 @@ def parse_arguments():
     parser.add_argument("-b", "--buffer", dest="buffer",
                         help="Specifies how many 0's to look for default is - Default is 40 bytes",
                         metavar="<buffSize>")
+
     parser.add_argument("-d", "--dir", metavar="<dir>",
                         help="Specify directory of files to scan")
+
     parser.add_argument("-ct", "--charthresh", metavar="<1-100>", dest="charthresh",
-                        help="Specifiy how often a character should appear in a cluster for it to be added to a rule, "
-                             "e.g. 90% of the cluster = 90")
+                        help="Specifiy how often a character should appear in a cluster for it to be added to a rule, e.g. 90%% of the cluster = 90")
+
     parser.add_argument("-st", "--stringthresh", metavar="<1-100>", dest="stringthresh",
-                        help="Specifiy how similar the hex data must be for the string to be added to a cluster, "
-                             "e.g. 80% similarity = 80")
+                        help="Specifiy how similar the hex data must be for the string to be added to a cluster e.g. 80%% similarity = 80")
+
     args = parser.parse_args()
 
     return args
