@@ -9,6 +9,14 @@ from fuzzywuzzy import fuzz
 def main():
     args = parse_arguments()
     buffer_size = 40
+    string_match_thresh = 70
+    char_match_thresh = 90
+
+    if args.charthresh is not None:
+        char_match_thresh = args.charthresh
+
+    if args.stringthresh is not None:
+        string_match_thresh = args.stringthresh
 
     print("=========================================================================================")
     print("                 PEPacker YARA Rule Generator - USE WITH CAUTION!")
@@ -24,8 +32,8 @@ def main():
     if args.dir is not None:
         print("\tProcessing data after entry points...\n")
         files_dict = create_file_dictionary(args, buffer_size)
-        cluster_lists = round_robin(files_dict)
-        print_function(cluster_lists, len(files_dict))
+        cluster_lists = round_robin(files_dict, string_match_thresh)
+        print_function(cluster_lists, len(files_dict), char_match_thresh)
     else:
         print("A directory must be specified for this tool to run, please ensure you have a large enough dataset")
         return
@@ -34,14 +42,18 @@ def main():
 '''Prints out the cluster information'''
 
 
-def print_function(cluster_lists, overall_length):
+def print_function(cluster_lists, overall_length, char_match_thresh):
     est_covered = 0
     total_files = 0
     for each in range(len(cluster_lists)):
+
         total_files += len(cluster_lists[each])
+
         if len(cluster_lists[each]) > 4:
-            final_out = calculate_most_common_at_index(cluster_lists[each])
+
+            final_out = calculate_most_common_at_index(cluster_lists[each], char_match_thresh)
             yara_output = format_function(final_out)
+
             print("\n=========================================================================================")
             print("Cluster " + str(each + 1) + " Generated Yara Rule")
             if len(cluster_lists[each]) < 10:
@@ -49,8 +61,10 @@ def print_function(cluster_lists, overall_length):
             print("=========================================================================================")
             print("Num files in cluster: " + str(len(cluster_lists[each])) + "\n")
             print(yara_output + "\n")
+
             est_covered += len(cluster_lists[each])
         else:
+
             print("=========================================================================================")
             print("Cluster " + str(each + 1) + " was not big enough to create a rule with any accuracy")
             print("=========================================================================================")
@@ -79,8 +93,8 @@ def format_function(final_out):
 '''Uses Fuzzywuzzy library to get a partial ratio to determine how alike two hex strings are'''
 
 
-def match_function(file1, file2):  # TODO ADD IN CMD LINE VARIABLE TO ADJUST THE SIMILARITY RATIO
-    thresh = 70
+def match_function(file1, file2, string_match_thresh):  # TODO ADD IN CMD LINE VARIABLE TO ADJUST THE SIMILARITY RATIO
+    string_match_thresh = 70
 
     # If both files aren't blank
     if file1 != 0 and file2 != 0:
@@ -88,7 +102,7 @@ def match_function(file1, file2):  # TODO ADD IN CMD LINE VARIABLE TO ADJUST THE
         val = fuzz.ratio(file1, file2)
 
         # if the fuzzywuzzy ratio is greater than the threshold return true
-        if val > thresh:
+        if val > string_match_thresh:
             return True
 
         else:
@@ -100,12 +114,11 @@ def match_function(file1, file2):  # TODO ADD IN CMD LINE VARIABLE TO ADJUST THE
 '''Calculate the occurences of a file at a given index in a file and return the list'''
 
 
-def calculate_most_common_at_index(cluster_list):
+def calculate_most_common_at_index(cluster_list, char_match_thresh):
     final_out = list()
 
     for x in range(len(cluster_list[0])):
-        index_list = list(zip(*cluster_list))[x]  # TODO | MAYBE ADD IN A FEATURE TO IGNORE THE RESULT IF
-        # TODO | THE INDEX HAS A HIGHER DEGREE OF ENTROPY
+        index_list = list(zip(*cluster_list))[x]
 
         # First = Most common character at a given position
         first = Counter(index_list).most_common(1)[0][0]
@@ -116,9 +129,9 @@ def calculate_most_common_at_index(cluster_list):
         clust_len = len(cluster_list)
 
         # Threshold - If it doesn't occur in 90% of the cluster then mark it as ?
-        thresh = 0.90
+        char_match_thresh = 0.90
         # Out of total occurrences if first is not a substantially high fraction then ignore it
-        if (first_len / clust_len) < thresh:
+        if (first_len / clust_len) < char_match_thresh:
             final_out.append("?")
 
         # If it occurs > threshold then append the character here
@@ -132,7 +145,7 @@ def calculate_most_common_at_index(cluster_list):
 '''Uses round robin to iterate through each possible match without duplication of matches'''
 
 
-def round_robin(files_dict):
+def round_robin(files_dict, string_match_thresh):
     values = list(files_dict.values())
 
     # Might have to create an iterable cluster list here
@@ -144,16 +157,16 @@ def round_robin(files_dict):
             for y in range(x + 1, len(
                     values)):  # TODO DOUBLE CHECK THIS TO MAKE SURE ITS ITERATING THROUGH THE CORRECT BUFFER SIZE
 
-                if match_function(values[x], values[y]):
+                if match_function(values[x], values[y], string_match_thresh):
 
                     if len(cluster_lists[amount_of_list]) != 0 and match_function(cluster_lists[amount_of_list][0],
-                                                                                  values[y]):
+                                                                                  values[y], string_match_thresh):
                         cluster_lists[amount_of_list].append(values[y])
 
                     elif len(cluster_lists[amount_of_list]) == 0:  # If its the first file of the loop
                         cluster_lists[amount_of_list].append(values[y])
 
-                elif not match_function(values[x], values[y]):
+                elif not match_function(values[x], values[y], string_match_thresh):
                     continue
 
             values = [x for x in values if x not in cluster_lists[amount_of_list]]
@@ -223,6 +236,12 @@ def parse_arguments():
                         metavar="<buffSize>")
     parser.add_argument("-d", "--dir", metavar="<dir>",
                         help="Specify directory of files to scan")
+    parser.add_argument("-ct", "--charthresh", metavar="<1-100>", dest="charthresh",
+                        help="Specifiy how often a character should appear in a cluster for it to be added to a rule, "
+                             "e.g. 90% of the cluster = 90")
+    parser.add_argument("-st", "--stringthresh", metavar="<1-100>", dest="stringthresh",
+                        help="Specifiy how similar the hex data must be for the string to be added to a cluster, "
+                             "e.g. 80% similarity = 80")
     args = parser.parse_args()
 
     return args
