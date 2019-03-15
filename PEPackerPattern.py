@@ -38,6 +38,14 @@ def main():
         print("A directory must be specified for this tool to run, please ensure you have a large enough dataset")
         return
 
+# TODO implement these presets
+
+# def get_entry_rwx_section:
+#
+# def get_entry_behind_last_section:
+#
+# def get_entry_import_table:
+
 
 '''Prints out the cluster information'''
 
@@ -147,15 +155,18 @@ def calculate_most_common_at_index(cluster_list, char_match_thresh):
 
 def round_robin(files_dict, string_match_thresh):
     values = list(files_dict.values())
+
     # Might have to create an iterable cluster list here
     cluster_lists = [[] for i in range(15)]
 
+    # For each of the cluster lists
     for amount_of_list in range(len(cluster_lists)):
-
+        # For each of the lists
         for x in range(len(values)):
+            # For each of the lists except for the ones that have already been checked
             for y in range(x + 1, len(
                     values)):
-
+                # if the two files have a similarity over the provided threshold (This returns a boolean)
                 if match_function(values[x], values[y], string_match_thresh):
 
                     if len(cluster_lists[amount_of_list]) != 0 and match_function(cluster_lists[amount_of_list][0],
@@ -170,7 +181,8 @@ def round_robin(files_dict, string_match_thresh):
 
             values = [x for x in values if x not in cluster_lists[amount_of_list]]
 
-    cluster_lists.sort(key=len, reverse=True)
+        cluster_lists.sort(key=len, reverse=True) # This is probably resource intensive - Might be a better place to put this sort
+
 
     ret_list = list()
     for x in range(len(cluster_lists)):
@@ -224,6 +236,7 @@ def get_data(filename, buffer_size):
 
 '''Parses the arguments provided on the command line'''
 
+
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description="Compare a section of bytes in multiple files, located after the entry point, to aid in the creation of packer detection yara rules")
@@ -251,14 +264,18 @@ def parse_arguments():
 
 def read_from_hex_offset(filename, hex_offset, buffer_size):
     filename = open(filename, 'rb')
-    offset = int(hex_offset, base=16)
+    if hex_offset is not None:
 
-    filename.seek(offset, 0)
-    data = filename.read(buffer_size)
+        offset = int(hex_offset, base=16)
 
-    hex_data = binascii.hexlify(data)
+        filename.seek(offset, 0)
+        data = filename.read(buffer_size)
 
-    return hex_data
+        hex_data = binascii.hexlify(data)
+
+        return hex_data
+    else:
+        return "0"
 
 
 '''Calculates the REAL entry point of a file using the formula shown below'''
@@ -269,14 +286,17 @@ def get_entry_point(filename):
 
     ep_section = find_entry_point_section(pe, pe.OPTIONAL_HEADER.AddressOfEntryPoint)
 
-    entry_point = pe.OPTIONAL_HEADER.AddressOfEntryPoint
+    if ep_section is not None:
+        entry_point = pe.OPTIONAL_HEADER.AddressOfEntryPoint
 
-    delta = entry_point - ep_section.VirtualAddress
+        delta = entry_point - ep_section.VirtualAddress
 
-    actual_entry_point = ep_section.PointerToRawData + delta
+        actual_entry_point = ep_section.PointerToRawData + delta
 
-    entry_point = hex(actual_entry_point)
-    return entry_point
+        entry_point = hex(actual_entry_point)
+        return entry_point
+    else:
+        return
 
 
 '''Finds and returns the section that contains the entry point'''
