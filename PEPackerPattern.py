@@ -1,9 +1,18 @@
+import subprocess
 import argparse
 import binascii
 import os
 from collections import Counter
-import pefile
-from fuzzywuzzy import fuzz
+
+try:
+    import pefile
+    from fuzzywuzzy import fuzz
+    
+except ImportError:
+    subprocess.call(['pip', 'install', 'pefile'])
+    subprocess.call(['pip', 'install', 'fuzzywuzzy'])
+    import pefile
+    from fuzzywuzzy import fuzz
 
 
 def main():

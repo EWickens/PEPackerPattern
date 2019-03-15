@@ -1,7 +1,11 @@
 """This offsets class is to be used to calculate the offsets for the seek command
     Such offsets to be determined will be DOS/OPTIONAL/IMPORT_TABLE/IMAGE_IMPORT_DESCRIPTOR"""
+import subprocess
+try:
+    import pefile
+except:
+    subprocess.call(['pip', 'install', 'pefile'])
 
-import pefile
 
 
 # TODO Could use pefiles inbuilt offset parsing functionality or could use the raw hex data at particular offsets
