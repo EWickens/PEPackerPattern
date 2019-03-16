@@ -71,6 +71,7 @@ def get_section_headers_data(pe):
     return temp_list
 
 # TODO GENERIFY THESE FUNCTIONS BY PASSING IN HEADER TYPE
+# TODO ADD IN SUPPORT FOR PARSING 64-BIT HEADERS
 def get_optional_header_data(pe):
     dos_header_data = pe.OPTIONAL_HEADER.dump_dict()
 
@@ -85,8 +86,19 @@ def get_optional_header_data(pe):
     return temp_list
 
 def get_image_entry_import_data(pe):
-    print("Hi")
+    pe.parse_data_directories()
+    import_list = []
+    temp = {}
 
+    for entry in pe.DIRECTORY_ENTRY_IMPORT:
+        temp_imp_list = []
+        for imp in entry.imports:
+            temp_imp_list.append(imp.name)
+        temp[entry.dll] = temp_imp_list
+        import_list.append(temp)
+
+
+    return import_list
 def get_dos_header_data(pe):
     dos_header = pe.DOS_HEADER
 
