@@ -7,15 +7,18 @@ try:
 except ImportError:
     subprocess.call(['pip', 'install', 'pefile'])
 
+
 # TODO Could use pefiles inbuilt offset parsing functionality or could use the raw hex data at particular offsets
 def main():
-    filename = "C:/Program Files (x86)/Lenovo/PowerMgr/PWMUI.exe"
+    filename = "Armadillo/0BCED4EBFC8207ED7952FAB04DF579065FB6785AD76902D71184EBD4D70B07B4"
 
     pe = pefile.PE(filename)
 
-    # info = pe.Dump()
-    get_section_entry_point(pe)
+    get_section_headers_data(pe)
 
+    get_optional_header_data(pe)
+
+    get_image_entry_import_data(pe)
 
 def calculate_actual_entry_point(filename):
     pe = pefile.PE(filename)  # Takes the filename from command line argument and loads PE file
@@ -43,28 +46,51 @@ def find_entry_point_section(pe, entry_point):
     return None
 
 
-# TODO TRUNCATE DICTIONARY OR CREATE MY OWN
-def get_section_entry_point(pe):
+"""Returns a list of lists of dictionaries containing the key:value pair of all the info of each of the section headers"""
+
+
+# TODO RESULTS FROM THE HEADER ARE STORED IN BASE 10 and not HEX for the time being
+def get_section_headers_data(pe):
     section_header_data = list()
-    parsed_list = list()
 
     for section in pe.sections:
-        print(section)
+        # print(section)
         section_header_data.append(section.dump_dict())
 
-    tempList = []
+    temp_list = []
 
+    print section_header_data
     for each in section_header_data:
+        print each
         temp = dict()
         for key in each.keys():
             if type(each[key]) == type(dict()):
                 temp[key] = each[key]['Value']
+        temp_list.append(temp)
 
-        tempList.append(temp)
+    return temp_list
 
+# TODO GENERIFY THESE FUNCTIONS BY PASSING IN HEADER TYPE
+def get_optional_header_data(pe):
+    dos_header_data = pe.OPTIONAL_HEADER.dump_dict()
 
-def flatten_dict():
-    return
+    temp_list = []
+
+    for key in dos_header_data.keys():
+        temp = dict()
+        if type(dos_header_data[key]) == type(dict()):
+            temp[key] = dos_header_data[key]['Value'] # ERROR BEING THROWN HERE
+            temp_list.append(temp)
+
+    return temp_list
+
+def get_image_entry_import_data(pe):
+    print("Hi")
+
+def get_dos_header_data(pe):
+    dos_header = pe.DOS_HEADER
+
+    print(dos_header)
 
 if __name__ == "__main__":
     main()
