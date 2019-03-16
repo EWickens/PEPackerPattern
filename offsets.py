@@ -20,6 +20,13 @@ def main():
 
     get_image_entry_import_data(pe)
 
+    get_dos_header_data(pe)
+
+    imphash = pe.get_imphash()
+
+    rsrc_list = get_rsc_data(pe)
+
+
 def calculate_actual_entry_point(filename):
     pe = pefile.PE(filename)  # Takes the filename from command line argument and loads PE file
 
@@ -70,6 +77,7 @@ def get_section_headers_data(pe):
 
     return temp_list
 
+
 # TODO GENERIFY THESE FUNCTIONS BY PASSING IN HEADER TYPE
 # TODO ADD IN SUPPORT FOR PARSING 64-BIT HEADERS
 def get_optional_header_data(pe):
@@ -80,10 +88,11 @@ def get_optional_header_data(pe):
     for key in dos_header_data.keys():
         temp = dict()
         if type(dos_header_data[key]) == type(dict()):
-            temp[key] = dos_header_data[key]['Value'] # ERROR BEING THROWN HERE
+            temp[key] = dos_header_data[key]['Value']  # ERROR BEING THROWN HERE
             temp_list.append(temp)
 
     return temp_list
+
 
 def get_image_entry_import_data(pe):
     pe.parse_data_directories()
@@ -97,12 +106,39 @@ def get_image_entry_import_data(pe):
         temp[entry.dll] = temp_imp_list
         import_list.append(temp)
 
-
     return import_list
-def get_dos_header_data(pe):
-    dos_header = pe.DOS_HEADER
 
-    print(dos_header)
+
+def get_dos_header_data(pe):
+    dos_header_data = pe.DOS_HEADER.dump_dict()
+    temp_list = []
+
+    for key in dos_header_data.keys():
+        temp = dict()
+        if type(dos_header_data[key]) == type(dict()):
+            temp[key] = dos_header_data[key]['Value']
+            temp_list.append(temp)
+
+    return temp_list
+
+#TODO Check if DLL and if DLL get this info, might want to check for this anyway - could use this as the check if it is a DLL?
+def get_dll_export_data(pe):
+
+    for exp in pe.DIRECTORY_ENTRY_EXPORT.symbols:
+        print hex(pe.OPTIONAL_HEADER.ImageBase + exp.address), exp.name, exp.ordinal
+
+#TODO TEST AGAINST A FILE WITH KNOWN RESOURCES IN ITS DIRECTORY
+def get_rsc_data(pe):
+
+    rsrc_list = []
+    for rsrc in pe.DIRECTORY_ENTRY_RESOURCE.entries:
+        for entry in rsrc.directory.entries:
+            print(entry)
+            if entry.name is not None:
+                rsrc_list.append(entry.name)
+                print(entry)
+    return rsrc_list
+
 
 if __name__ == "__main__":
     main()
