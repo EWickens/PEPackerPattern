@@ -1,5 +1,5 @@
-"""This offsets class is to be used to calculate the offsets for the seek command
-    Such offsets to be determined will be DOS/OPTIONAL/IMPORT_TABLE/IMAGE_IMPORT_DESCRIPTOR"""
+"""This offsets class is to be used to pull information from the PEFile library
+  and format the data into a more workable format.Example of info to be pulled = DOS/OPTIONAL/IMPORT_TABLE/IMAGE_IMPORT_DESCRIPTOR"""
 import subprocess
 
 try:
@@ -14,44 +14,17 @@ def main():
 
     pe = pefile.PE(filename)
 
-    get_section_headers_data(pe)
+    section_header_data = get_section_headers_data(pe)
 
-    get_optional_header_data(pe)
+    optional_header_data = get_optional_header_data(pe)
 
-    get_image_entry_import_data(pe)
+    import_data = get_image_entry_import_data(pe)
 
-    get_dos_header_data(pe)
+    dos_header_data = get_dos_header_data(pe)
 
     imphash = pe.get_imphash()
 
     rsrc_list = get_rsc_data(pe)
-
-
-def calculate_actual_entry_point(filename):
-    pe = pefile.PE(filename)  # Takes the filename from command line argument and loads PE file
-
-    ep_section = find_entry_point_section(pe, pe.OPTIONAL_HEADER.AddressOfEntryPoint)
-
-    if ep_section is not None:
-        entry_point = pe.OPTIONAL_HEADER.AddressOfEntryPoint
-
-        delta = entry_point - ep_section.VirtualAddress
-
-        actual_entry_point = ep_section.PointerToRawData + delta
-
-        entry_point = hex(actual_entry_point)
-        return entry_point
-    else:
-        return
-
-
-def find_entry_point_section(pe, entry_point):
-    for section in pe.sections:
-        if section.contains_rva(entry_point):
-            return section
-
-    return None
-
 
 """Returns a list of lists of dictionaries containing the key:value pair of all the info of each of the section headers"""
 
