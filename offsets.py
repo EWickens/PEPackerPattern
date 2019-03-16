@@ -30,6 +30,8 @@ def main():
     print(rsrc_list)
     sl = list(get_strings(filename, min_string_length))
     print(sl)
+    cert_data = get_cert_data(pe)
+    print cert_data
 
 
 def get_strings(filename, min_string_length):
@@ -134,6 +136,18 @@ def get_rsc_data(pe):
                 print(entry)
     return rsrc_list
 
+def get_cert_data(pe):
+
+    address = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress
+    size = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].Size
+
+    if address == 0:
+        print 'Not Signed'
+        return
+
+    signature = pe.write()[address + 8:]
+
+    return signature
 
 if __name__ == "__main__":
     main()
