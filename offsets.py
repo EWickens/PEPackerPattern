@@ -1,6 +1,9 @@
 """This offsets class is to be used to pull information from the PEFile library
   and format the data into a more workable format.Example of info to be pulled = DOS/OPTIONAL/IMPORT_TABLE/IMAGE_IMPORT_DESCRIPTOR"""
+import re
+import string
 import subprocess
+import os
 
 try:
     import pefile
@@ -11,6 +14,7 @@ except ImportError:
 # TODO Could use pefiles inbuilt offset parsing functionality or could use the raw hex data at particular offsets
 def main():
     filename = "Armadillo/0BCED4EBFC8207ED7952FAB04DF579065FB6785AD76902D71184EBD4D70B07B4"
+    min_string_length = 8;
 
     pe = pefile.PE(filename)
 
@@ -25,6 +29,27 @@ def main():
     imphash = pe.get_imphash()
 
     rsrc_list = get_rsc_data(pe)
+
+    sl = list(get_strings(filename, min_string_length))
+
+    print(sl)
+
+def get_strings(filename, min_string_length):
+    result = ""
+
+    strings_list = []
+
+    with open(filename, "rb") as f:           # Python 2.x
+        result = ""
+        for c in f.read():
+            if c in string.printable:
+                result += c
+                continue
+            if len(result) >= min_string_length:
+                yield result
+            result = ""
+        if len(result) >= min_string_length:  # catch result at EOF
+            yield result
 
 """Returns a list of lists of dictionaries containing the key:value pair of all the info of each of the section headers"""
 
