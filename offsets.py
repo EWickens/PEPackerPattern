@@ -2,6 +2,8 @@
   and format the data into a more workable format.Example of info to be pulled = DOS/OPTIONAL/IMPORT_TABLE/IMAGE_IMPORT_DESCRIPTOR"""
 import string
 import subprocess
+from pyasn1.codec.native.decoder import decode
+from pyasn1_modules import rfc2459, rfc2315
 
 try:
     import pefile
@@ -11,33 +13,60 @@ except ImportError:
 
 # TODO Could use pefiles inbuilt offset parsing functionality or could use the raw hex data at particular offsets
 def main():
-    filename = "Armadillo/0BCED4EBFC8207ED7952FAB04DF579065FB6785AD76902D71184EBD4D70B07B4"
+    filename = "ViralTest/One" # REPLACE WITH A FILE
     min_string_length = 8
 
-    pe = pefile.PE(filename)
+    pe = pefile.PE(filename, fast_load=True)
+
+    all_files_data = []
+
+    all_files_data.append(get_file_data(pe, filename))
+
+    filename = "Armadillo/JAVA.exe" # REPLACE WITH A SECOND FILE
+
+    pe = pefile.PE(filename, fast_load=True)
+    all_files_data.append(get_file_data(pe, filename))
+    basic_compare(all_files_data)
+
+def basic_compare(all_files_data):
+    for diction in all_files_data:
+        for each in diction.values():
+            for next in each:
+                for i in next:
+                    print(i)
+
+def get_file_data(pe, filename):
+    file_data = []
 
     section_header_data = get_section_headers_data(pe)
-    print(section_header_data)
+    # print(section_header_data)
+    file_data.append(section_header_data)
     optional_header_data = get_optional_header_data(pe)
-    print(optional_header_data)
+    file_data.append(optional_header_data)
+    # print(optional_header_data)
     import_data = get_image_entry_import_data(pe)
-    print(import_data)
+    file_data.append(import_data)
+    # print(import_data)
     dos_header_data = get_dos_header_data(pe)
-    print(dos_header_data)
+    file_data.append(dos_header_data)
+    # print(dos_header_data)
+
     imphash = pe.get_imphash()
-    print(imphash)
+    # print(imphash)
     rsrc_list = get_rsc_data(pe)
-    print(rsrc_list)
-    sl = list(get_strings(filename, min_string_length))
-    print(sl)
-    cert_data = get_cert_data(pe)
-    print cert_data
+    # print(rsrc_list)
 
+    return_dict = {filename:file_data}
+    return return_dict
 
+    # sl = list(get_strings(filename, min_string_length))
+    # print(sl)
+    # cert_data = get_cert_data(pe)
+    # print cert_data
+# TODO HOW TO TELL IF A STRING IS ASCII OR WIDE??
+# TODO FIND A BETTER WAY OF SAVING/STORING STRINGS
 def get_strings(filename, min_string_length):
     result = ""
-
-    strings_list = []
 
     with open(filename, "rb") as f:  # Python 2.x
         result = ""
@@ -48,8 +77,8 @@ def get_strings(filename, min_string_length):
             if len(result) >= min_string_length:
                 yield result
             result = ""
-        if len(result) >= min_string_length:  # catch result at EOF
-            yield result
+        # if len(result) >= min_string_length:  # catch result at EOF
+        #     yield result
 
 
 """Returns a list of lists of dictionaries containing the key:value pair of all the info of each of the section headers"""
@@ -136,7 +165,8 @@ def get_rsc_data(pe):
                 print(entry)
     return rsrc_list
 
-def get_cert_data(pe):
+#TODO FIX CERT DATA, seems to give me some trouble.
+def get_cert_data(pe):  # If this gives trouble look at Didier Stevens tool disitool
 
     address = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress
     size = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].Size
@@ -147,7 +177,49 @@ def get_cert_data(pe):
 
     signature = pe.write()[address + 8:]
 
-    return signature
+    (contentInfo, rest) = decode(signature, asn1Spec=rfc2315.ContentInfo())
+
+    contentType = contentInfo.getComponentByName('contentType')
+    print(contentType)
+    if contentType == rfc2315.signedData:
+        signedData = decode(
+            contentInfo.getComponentByName('content'),
+            asn1Spec=rfc2315.SignedData())
+
+    for sd in signedData:
+        if sd == '':
+            continue
+
+        signerInfos = sd.getComponentByName('signerInfos')
+        for si in signerInfos:
+            issuerAndSerial = si.getComponentByName('issuerAndSerialNumber')
+            issuer = issuerAndSerial.getComponentByName('issuer').getComponent()
+            for i in issuer:
+                for r in i:
+                    at = r.getComponentByName('type')
+                    if rfc2459.id_at_countryName == at:
+                        cn = decode(
+                            r.getComponentByName('value'),
+                            asn1Spec=rfc2459.X520countryName())
+                        print(cn[0])
+                    elif rfc2459.id_at_organizationName == at:
+                        on = decode(
+                            r.getComponentByName('value'),
+                            asn1Spec=rfc2459.X520OrganizationName())
+                        print(on[0].getComponent())
+                    elif rfc2459.id_at_organizationalUnitName == at:
+                        ou = decode(
+                            r.getComponentByName('value'),
+                            asn1Spec=rfc2459.X520OrganizationalUnitName())
+                        print(ou[0].getComponent())
+                    elif rfc2459.id_at_commonName == at:
+                        cn = decode(
+                            r.getComponentByName('value'),
+                            asn1Spec=rfc2459.X520CommonName())
+                        print(cn[0].getComponent())
+                    else:
+                        print at
+
 
 if __name__ == "__main__":
     main()
