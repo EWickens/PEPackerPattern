@@ -22,7 +22,7 @@ def main():
 
 def create_file_dictionary(min_string_length):
     # Gets a list of all the files in the directory
-    TEMP_DIRECTORY = "POC/"
+    TEMP_DIRECTORY = "HASP/"
     hash_list = os.listdir(TEMP_DIRECTORY)
 
     # Print path to all filenames.
@@ -240,26 +240,29 @@ def get_dll_export_data(pe):
 def get_rsrc_data(pe):
     rsrc_list = []
 
-    if pe.DIRECTORY_ENTRY_RESOURCE is not None:
+    try:
         for rsrc in pe.DIRECTORY_ENTRY_RESOURCE.entries:
             for entry in rsrc.directory.entries:
                 if entry.name is not None:
                     rsrc_list.append(entry.name)
                     print(entry)
         return rsrc_list
-    else:
+    except AttributeError:
         return
 
 # TODO FIX CERT DATA, seems to give me some trouble.
 def get_cert_data(pe):
-    address = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress
-    size = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].Size
+    try:
+        address = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress
+        size = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].Size
 
-    if address == 0:
-        print 'Not Signed'
+        if address == 0:
+            print 'Not Signed'
+            return
+
+        return bytes(pe.write()[address + 8:(address + size)])
+    except:
         return
-
-    return bytes(pe.write()[address + 8:(address + size)])
 
 
 def get_digisig_info(dig_sig):  # Taken from TJ's cert_extractor
@@ -268,31 +271,34 @@ def get_digisig_info(dig_sig):  # Taken from TJ's cert_extractor
     out of a certificate. Normally returns just one
     signer.
     """
-    buf = BIO.MemoryBuffer(dig_sig)
-    smime_object = SMIME.PKCS7(m2.pkcs7_read_bio_der(buf._ptr()))
-    signers = smime_object.get0_signers(X509.X509_Stack())
-    certs = []
-    for cert in signers:
-        cert_info = {}
-        cert_parts = (cert.as_text()).split("\n")
-        for i, line in enumerate(cert_parts):
-            if line.startswith("        Subject:"):
-                cert_info["subject"] = get_openssl_string(line.lstrip("        Subject:"))
-            elif line.startswith("        Issuer:"):
-                cert_info["issuer"] = get_openssl_string(line.lstrip("        Issuer:"))
-            elif line.startswith("        Serial Number: "):
-                cert_hex = cert_parts[i].split(":")[1].split()[1].strip("(0x").strip(")")
-                if len(cert_hex) % 2 != 0:
-                    cert_hex = "0{}".format(cert_hex)
-                c_h = iter(cert_hex)
-                serial = ':'.join(a + b for a, b in zip(c_h, c_h))
-                cert_info["serial"] = serial
-            elif line == "        Serial Number:":
-                cert_info["serial"] = cert_parts[i + 1].strip()
-            else:
-                pass
-        certs.append(cert_info)
-    return certs  # TODO PROBABLY ONLY WANT TO KEEP THE SERIAL PORTION
+    try:
+        buf = BIO.MemoryBuffer(dig_sig)
+        smime_object = SMIME.PKCS7(m2.pkcs7_read_bio_der(buf._ptr()))
+        signers = smime_object.get0_signers(X509.X509_Stack())
+        certs = []
+        for cert in signers:
+            cert_info = {}
+            cert_parts = (cert.as_text()).split("\n")
+            for i, line in enumerate(cert_parts):
+                if line.startswith("        Subject:"):
+                    cert_info["subject"] = get_openssl_string(line.lstrip("        Subject:"))
+                elif line.startswith("        Issuer:"):
+                    cert_info["issuer"] = get_openssl_string(line.lstrip("        Issuer:"))
+                elif line.startswith("        Serial Number: "):
+                    cert_hex = cert_parts[i].split(":")[1].split()[1].strip("(0x").strip(")")
+                    if len(cert_hex) % 2 != 0:
+                        cert_hex = "0{}".format(cert_hex)
+                    c_h = iter(cert_hex)
+                    serial = ':'.join(a + b for a, b in zip(c_h, c_h))
+                    cert_info["serial"] = serial
+                elif line == "        Serial Number:":
+                    cert_info["serial"] = cert_parts[i + 1].strip()
+                else:
+                    pass
+            certs.append(cert_info)
+        return certs  # TODO PROBABLY ONLY WANT TO KEEP THE SERIAL PORTION
+    except SMIME.PKCS7_Error:
+        return
 
 
 def get_openssl_string(input_string):  # Taken from TJ's cert_extractor
