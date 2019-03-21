@@ -1,9 +1,10 @@
 """This offsets class is to be used to pull information from the PEFile library
   and format the data into a more workable format.Example of info to be pulled = DOS/OPTIONAL/IMPORT_TABLE/IMAGE_IMPORT_DESCRIPTOR"""
+import os
+import re
 import string
 import subprocess
-from pyasn1.codec.native.decoder import decode
-from pyasn1_modules import rfc2459, rfc2315
+from M2Crypto import SMIME, X509, BIO, m2
 
 try:
     import pefile
@@ -13,56 +14,136 @@ except ImportError:
 
 # TODO Could use pefiles inbuilt offset parsing functionality or could use the raw hex data at particular offsets
 def main():
-    filename = "ViralTest/One" # REPLACE WITH A FILE
+    filename = "ViralTest/One"  # REPLACE WITH A FILE
     min_string_length = 8
 
-    pe = pefile.PE(filename, fast_load=True)
+    create_file_dictionary(min_string_length)
 
-    all_files_data = []
 
-    all_files_data.append(get_file_data(pe, filename))
+def create_file_dictionary(min_string_length):
+    # Gets a list of all the files in the directory
+    TEMP_DIRECTORY = "POC/"
+    hash_list = os.listdir(TEMP_DIRECTORY)
 
-    filename = "Armadillo/JAVA.exe" # REPLACE WITH A SECOND FILE
+    # Print path to all filenames.
+    path_list = list()
 
-    pe = pefile.PE(filename, fast_load=True)
-    all_files_data.append(get_file_data(pe, filename))
-    basic_compare(all_files_data)
+    # Appends the directory name to the filename for the next step
+    for filename in hash_list:
+        path_list.append(os.path.join(TEMP_DIRECTORY, filename))
 
-def basic_compare(all_files_data):
-    for diction in all_files_data:
-        for each in diction.values():
-            for next in each:
-                for i in next:
-                    print(i)
+    dictionary = dict.fromkeys(path_list, 0)
 
-def get_file_data(pe, filename):
-    file_data = []
+    # Gets the data from every file in the directory and creates a dictionary
+    # Filename is Key and Data is value
+    for filename in path_list:
+        try:
+            pe = pefile.PE(filename, fast_load=True)
+            file_obj = get_file_data(pe, filename, min_string_length)
+            dictionary[filename] = file_obj
+        except pefile.PEFormatError:
+            continue
 
-    section_header_data = get_section_headers_data(pe)
-    # print(section_header_data)
-    file_data.append(section_header_data)
-    optional_header_data = get_optional_header_data(pe)
-    file_data.append(optional_header_data)
-    # print(optional_header_data)
-    import_data = get_image_entry_import_data(pe)
-    file_data.append(import_data)
-    # print(import_data)
-    dos_header_data = get_dos_header_data(pe)
-    file_data.append(dos_header_data)
-    # print(dos_header_data)
+    return dictionary
 
-    imphash = pe.get_imphash()
-    # print(imphash)
-    rsrc_list = get_rsc_data(pe)
-    # print(rsrc_list)
 
-    return_dict = {filename:file_data}
-    return return_dict
+class FileData:
 
-    # sl = list(get_strings(filename, min_string_length))
-    # print(sl)
-    # cert_data = get_cert_data(pe)
-    # print cert_data
+    def __init__(self):
+        self.__set_section_header_data(0)
+        self.__set_optional_header_data(0)
+        self.__set_import_data(0)
+        self.__set_imphash(0)
+        self.__set_dos_header_data(0)
+        self.__set_rsrc_list(0)
+        self.__set_sig_details(0)
+        self.__set_string_list(0)
+
+    def __get_section_header_data(self):
+        return self.__section_header_data
+
+    def __set_section_header_data(self, input):
+        self.__section_header_data = input
+
+    section_header_data = property(__get_section_header_data, __set_section_header_data)
+
+    def __get_optional_header_data(self):
+        return self.__optional_header_data
+
+    def __set_optional_header_data(self, input):
+        self.__optional_header_data = input
+
+    optional_header_data = property(__get_optional_header_data, __set_optional_header_data)
+
+    def __get_import_data(self):
+        return self.__import_data
+
+    def __set_import_data(self, input):
+        self.__import_data = input
+
+    import_data = property(__get_import_data, __set_import_data)
+
+    def __get_imphash(self):
+        return self.__imphash
+
+    def __set_imphash(self, input):
+        self.__imphash = input
+
+    imphash = property(__get_imphash, __set_imphash)
+
+    def __get_dos_header_data(self):
+        return self.__dos_header_data
+
+    def __set_dos_header_data(self, input):
+        self.__dos_header_data = input
+
+    dos_header_data = property(__get_dos_header_data, __set_dos_header_data)
+
+    def __get_rsrc_list(self):
+        return self.__rsrc_list
+
+    def __set_rsrc_list(self, input):
+        self.__rsrc_list = input
+
+    rsrc_list = property(__get_rsrc_list, __set_rsrc_list)
+
+    def __get_sig_details(self):
+        return self.__sig_details
+
+    def __set_sig_details(self, input):
+        self.__sig_details = input
+
+    sig_details = property(__get_sig_details, __set_sig_details)
+
+    def __get_string_list(self):
+        return self.__string_list
+
+    def __set_string_list(self, input):
+        self.__sig_details = input
+
+    string_list = property(__get_sig_details, __set_sig_details)
+
+def get_file_data(pe, filename, min_string_length):
+    temp_file = FileData()
+
+    temp_file.section_header_data = get_section_headers_data(pe)
+    temp_file.optional_header_data = get_optional_header_data(pe)
+    temp_file.import_data = get_image_entry_import_data(pe)
+    temp_file.dos_header_data = get_dos_header_data(pe)
+    temp_file.section_header_data = get_section_headers_data(pe)
+    temp_file.imphash = pe.get_imphash()
+    temp_file.rsrc_list = get_rsrc_data(pe)
+
+    dig_sig = get_cert_data(pe)
+
+    if dig_sig is not None:  # Arbitrary number
+        temp_file.sig_details = get_digisig_info(dig_sig)
+
+    temp_file.string_list = set(get_strings(filename, min_string_length))
+
+    return temp_file
+
+
 # TODO HOW TO TELL IF A STRING IS ASCII OR WIDE??
 # TODO FIND A BETTER WAY OF SAVING/STORING STRINGS
 def get_strings(filename, min_string_length):
@@ -156,18 +237,21 @@ def get_dll_export_data(pe):
 
 
 # TODO TEST AGAINST A FILE WITH KNOWN RESOURCES IN ITS DIRECTORY
-def get_rsc_data(pe):
+def get_rsrc_data(pe):
     rsrc_list = []
-    for rsrc in pe.DIRECTORY_ENTRY_RESOURCE.entries:
-        for entry in rsrc.directory.entries:
-            if entry.name is not None:
-                rsrc_list.append(entry.name)
-                print(entry)
-    return rsrc_list
 
-#TODO FIX CERT DATA, seems to give me some trouble.
-def get_cert_data(pe):  # If this gives trouble look at Didier Stevens tool disitool
+    if pe.DIRECTORY_ENTRY_RESOURCE is not None:
+        for rsrc in pe.DIRECTORY_ENTRY_RESOURCE.entries:
+            for entry in rsrc.directory.entries:
+                if entry.name is not None:
+                    rsrc_list.append(entry.name)
+                    print(entry)
+        return rsrc_list
+    else:
+        return
 
+# TODO FIX CERT DATA, seems to give me some trouble.
+def get_cert_data(pe):
     address = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress
     size = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].Size
 
@@ -175,50 +259,60 @@ def get_cert_data(pe):  # If this gives trouble look at Didier Stevens tool disi
         print 'Not Signed'
         return
 
-    signature = pe.write()[address + 8:]
+    return bytes(pe.write()[address + 8:(address + size)])
 
-    (contentInfo, rest) = decode(signature, asn1Spec=rfc2315.ContentInfo())
 
-    contentType = contentInfo.getComponentByName('contentType')
-    print(contentType)
-    if contentType == rfc2315.signedData:
-        signedData = decode(
-            contentInfo.getComponentByName('content'),
-            asn1Spec=rfc2315.SignedData())
+def get_digisig_info(dig_sig):  # Taken from TJ's cert_extractor
+    """
+    Returns a list of dicts of signers information extracted
+    out of a certificate. Normally returns just one
+    signer.
+    """
+    buf = BIO.MemoryBuffer(dig_sig)
+    smime_object = SMIME.PKCS7(m2.pkcs7_read_bio_der(buf._ptr()))
+    signers = smime_object.get0_signers(X509.X509_Stack())
+    certs = []
+    for cert in signers:
+        cert_info = {}
+        cert_parts = (cert.as_text()).split("\n")
+        for i, line in enumerate(cert_parts):
+            if line.startswith("        Subject:"):
+                cert_info["subject"] = get_openssl_string(line.lstrip("        Subject:"))
+            elif line.startswith("        Issuer:"):
+                cert_info["issuer"] = get_openssl_string(line.lstrip("        Issuer:"))
+            elif line.startswith("        Serial Number: "):
+                cert_hex = cert_parts[i].split(":")[1].split()[1].strip("(0x").strip(")")
+                if len(cert_hex) % 2 != 0:
+                    cert_hex = "0{}".format(cert_hex)
+                c_h = iter(cert_hex)
+                serial = ':'.join(a + b for a, b in zip(c_h, c_h))
+                cert_info["serial"] = serial
+            elif line == "        Serial Number:":
+                cert_info["serial"] = cert_parts[i + 1].strip()
+            else:
+                pass
+        certs.append(cert_info)
+    return certs  # TODO PROBABLY ONLY WANT TO KEEP THE SERIAL PORTION
 
-    for sd in signedData:
-        if sd == '':
-            continue
 
-        signerInfos = sd.getComponentByName('signerInfos')
-        for si in signerInfos:
-            issuerAndSerial = si.getComponentByName('issuerAndSerialNumber')
-            issuer = issuerAndSerial.getComponentByName('issuer').getComponent()
-            for i in issuer:
-                for r in i:
-                    at = r.getComponentByName('type')
-                    if rfc2459.id_at_countryName == at:
-                        cn = decode(
-                            r.getComponentByName('value'),
-                            asn1Spec=rfc2459.X520countryName())
-                        print(cn[0])
-                    elif rfc2459.id_at_organizationName == at:
-                        on = decode(
-                            r.getComponentByName('value'),
-                            asn1Spec=rfc2459.X520OrganizationName())
-                        print(on[0].getComponent())
-                    elif rfc2459.id_at_organizationalUnitName == at:
-                        ou = decode(
-                            r.getComponentByName('value'),
-                            asn1Spec=rfc2459.X520OrganizationalUnitName())
-                        print(ou[0].getComponent())
-                    elif rfc2459.id_at_commonName == at:
-                        cn = decode(
-                            r.getComponentByName('value'),
-                            asn1Spec=rfc2459.X520CommonName())
-                        print(cn[0].getComponent())
-                    else:
-                        print at
+def get_openssl_string(input_string):  # Taken from TJ's cert_extractor
+    """
+    Returns the OpenSSL forward slash format of the
+    X509 string of Issuer and Subject
+    """
+    new_string = "/"
+    for i, char in enumerate(input_string):
+        try:
+            if ((char == "," and input_string[i + 1] == " ") and
+                    ((re.match("[A-Z]", input_string[i + 2]) and
+                      input_string[i + 3] == "=") or
+                     (re.match("[A-Z]", input_string[i + 3]) and
+                      input_string[i + 4] == "="))):
+                char = "_TOKEN_"
+        except:
+            pass
+        new_string += char
+    return new_string.replace("_TOKEN_ ", "/")
 
 
 if __name__ == "__main__":
