@@ -85,7 +85,7 @@ def get_top_words(word_set, total_word_freq):
             for each in word_set:
                 total_word_freq.append({each: 1})
 
-        compFun = lambda word, total_word_freq: [kvPair for kvPair in total_word_freq if kvPair['word'] == word]
+        compFun = lambda words, word_freq: [kvPair for kvPair in word_freq if words in kvPair]
 
         for word in word_set:
 
