@@ -5,6 +5,7 @@ import re
 import string
 from M2Crypto import SMIME, X509, BIO, m2
 import pefile
+import operator
 
 
 # TODO Must add in exception handling for files with no import/export tables.
@@ -51,7 +52,7 @@ def create_file_dictionary(min_string_length):
         top_words_list = get_top_words(files[each].string_list, top_words_list)
 
     top_imphash_list.sort(key=len, reverse=True)
-    top_words_list.sort(key=len, reverse=True)
+    top_words_list = sorted(top_words_list, key=lambda x: x.values(), reverse=True)
 
     print(top_words_list)
     return files
@@ -61,7 +62,6 @@ def create_file_dictionary(min_string_length):
 def get_top_imphash(imphash, dict_list):
     if len(imphash) > 0 and imphash is not None:
         exists = False
-        temp_dict = {}
 
         if len(dict_list) > 0:
             for dict_item in dict_list:
@@ -88,15 +88,14 @@ def get_top_words(word_set, total_word_freq):
         compFun = lambda words, word_freq: [kvPair for kvPair in word_freq if words in kvPair]
 
         for word in word_set:
+            res = compFun(word, total_word_freq)
 
             if len(compFun(word, total_word_freq)) == 0:
                 total_word_freq.append({word: 1})
-
             else:
-                print("Adding")
-                key[word] += 1
+                index = total_word_freq.index(res[0])
+                total_word_freq[index][word] += 1
 
-        print(total_word_freq)
         return total_word_freq
 
 
