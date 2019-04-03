@@ -3,26 +3,24 @@
 import os
 import re
 import string
-import subprocess
 from M2Crypto import SMIME, X509, BIO, m2
-
-try:
-    import pefile
-except ImportError:
-    subprocess.call(['pip', 'install', 'pefile'])
+import pefile
 
 
-# TODO Could use pefiles inbuilt offset parsing functionality or could use the raw hex data at particular offsets
+# TODO Must add in exception handling for files with no import/export tables.
+# Can feed this into rule by saying no of export = 0
+# Number of imports = 0
+
 def main():
-    filename = "ViralTest/One"  # REPLACE WITH A FILE
     min_string_length = 8
 
-    create_file_dictionary(min_string_length)
+    files = create_file_dictionary(min_string_length)
+    # basic_compare(files)
 
 
 def create_file_dictionary(min_string_length):
     # Gets a list of all the files in the directory
-    TEMP_DIRECTORY = "HASP/"
+    TEMP_DIRECTORY = "PETYA/"
     hash_list = os.listdir(TEMP_DIRECTORY)
 
     # Print path to all filenames.
@@ -32,7 +30,7 @@ def create_file_dictionary(min_string_length):
     for filename in hash_list:
         path_list.append(os.path.join(TEMP_DIRECTORY, filename))
 
-    dictionary = dict.fromkeys(path_list, 0)
+    files = list()
 
     # Gets the data from every file in the directory and creates a dictionary
     # Filename is Key and Data is value
@@ -40,16 +38,72 @@ def create_file_dictionary(min_string_length):
         try:
             pe = pefile.PE(filename, fast_load=True)
             file_obj = get_file_data(pe, filename, min_string_length)
-            dictionary[filename] = file_obj
-        except pefile.PEFormatError:
+            files.append(file_obj)
+        except pefile.PEFormatError, AttributeError:
             continue
 
-    return dictionary
+    print(len(files))
+    top_imphash_list = list()  # DONE
+    top_words_list = list({})
+
+    for each in range(len(files)):
+        top_imphash_list = get_top_imphash(files[each].imphash, top_imphash_list)
+        top_words_list = get_top_words(files[each].string_list, top_words_list)
+
+    top_imphash_list.sort(key=len, reverse=True)
+    top_words_list.sort(key=len, reverse=True)
+
+    print(top_words_list)
+    return files
+
+
+# Passes in an attribute from FileData and FileData+1
+def get_top_imphash(imphash, dict_list):
+    if len(imphash) > 0 and imphash is not None:
+        exists = False
+        temp_dict = {}
+
+        if len(dict_list) > 0:
+            for dict_item in dict_list:
+                for key in dict_item:
+                    if imphash == key:
+                        dict_item[key] += 1
+                        exists = True
+                if not exists:
+                    dict_list.append({imphash: 1})
+                    break
+
+        elif len(dict_list) == 0:
+            dict_list.append({imphash: 1})
+
+        return dict_list
+
+
+def get_top_words(word_set, total_word_freq):
+
+        if len(total_word_freq) == 0:
+            for each in word_set:
+                total_word_freq.append({each: 1})
+
+        compFun = lambda word, total_word_freq: [kvPair for kvPair in total_word_freq if kvPair['word'] == word]
+
+        for word in word_set:
+
+            if len(compFun(word, total_word_freq)) == 0:
+                total_word_freq.append({word: 1})
+
+            else:
+                print("Adding")
+                key[word] += 1
+
+        print(total_word_freq)
+        return total_word_freq
 
 
 class FileData:
 
     def __init__(self):
+        self.__set_file_name(0)
         self.__set_section_header_data(0)
         self.__set_optional_header_data(0)
         self.__set_import_data(0)
@@ -58,6 +112,14 @@ class FileData:
         self.__set_rsrc_list(0)
         self.__set_sig_details(0)
         self.__set_string_list(0)
+
+    def __get_file_name(self):
+        return self.__file_name
+
+    def __set_file_name(self, input):
+        self.__file_name = input
+
+    section_header_data = property(__get_file_name, __set_file_name)
 
     def __get_section_header_data(self):
         return self.__section_header_data
@@ -123,9 +185,14 @@ class FileData:
 
     string_list = property(__get_sig_details, __set_sig_details)
 
+    def __iter__(self):
+        for attr, value in self.__dict__.iteritems():
+            yield attr, value
+
+
 def get_file_data(pe, filename, min_string_length):
     temp_file = FileData()
-
+    temp_file.file_name = filename
     temp_file.section_header_data = get_section_headers_data(pe)
     temp_file.optional_header_data = get_optional_header_data(pe)
     temp_file.import_data = get_image_entry_import_data(pe)
@@ -149,17 +216,17 @@ def get_file_data(pe, filename, min_string_length):
 def get_strings(filename, min_string_length):
     result = ""
 
-    with open(filename, "rb") as f:  # Python 2.x
+    with open(filename, "rb") as f:
         result = ""
         for c in f.read():
             if c in string.printable:
                 result += c
                 continue
-            if len(result) >= min_string_length:
+            if len(result) >= min_string_length:  # TODO Might put in maximum string length here
                 yield result
             result = ""
-        # if len(result) >= min_string_length:  # catch result at EOF
-        #     yield result
+        if len(result) >= min_string_length:  # catch result at EOF
+            yield result
 
 
 """Returns a list of lists of dictionaries containing the key:value pair of all the info of each of the section headers"""
@@ -171,7 +238,6 @@ def get_section_headers_data(pe):
     section_header_data = list()
 
     for section in pe.sections:
-        # print(section)
         section_header_data.append(section.dump_dict())
 
     temp_list = []
@@ -250,10 +316,12 @@ def get_rsrc_data(pe):
     except AttributeError:
         return
 
+
 # TODO FIX CERT DATA, seems to give me some trouble.
 def get_cert_data(pe):
     try:
-        address = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress
+        address = pe.OPTIONAL_HEADER.DATA_DIRECTORY[
+            pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].VirtualAddress
         size = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_SECURITY']].Size
 
         if address == 0:
