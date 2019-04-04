@@ -1,12 +1,11 @@
 """This offsets class is to be used to pull information from the PEFile library
   and format the data into a more workable format.Example of info to be pulled = DOS/OPTIONAL/IMPORT_TABLE/IMAGE_IMPORT_DESCRIPTOR"""
+import json
 import os
 import re
 import string
 from M2Crypto import SMIME, X509, BIO, m2
 import pefile
-import operator
-
 
 # TODO Must add in exception handling for files with no import/export tables.
 # Can feed this into rule by saying no of export = 0
@@ -46,20 +45,64 @@ def create_file_dictionary(min_string_length):
     print(len(files))
     top_imphash_list = list()  # DONE
     top_words_list = list({})
+    dos_header_list = list()
+    section_header_list = list()
+    import_data_list = list()
+    optional_header_list = list()
+    rsrc_list = list()
 
     for each in range(len(files)):
         top_imphash_list = get_top_imphash(files[each].imphash, top_imphash_list)
         top_words_list = get_top_words(files[each].string_list, top_words_list)
+        dos_header_list = get_top_header(files[each].dos_header_data, dos_header_list)
+        section_header_list = get_top_header(files[each].section_header_data, section_header_list)
+        import_data_list = get_top_header(files[each].import_data, import_data_list)
+        optional_header_list = get_top_header(files[each].optional_header_data, optional_header_list)
+        rsrc_list = get_top_header(files[each].rsrc_list, rsrc_list)
 
     top_imphash_list.sort(key=len, reverse=True)
     top_words_list = sorted(top_words_list, key=lambda x: x.values(), reverse=True)
+    dos_header_list = sorted(dos_header_list, key=lambda x: x.values(), reverse=True)
+    section_header_list = sorted(section_header_list, key=lambda x: x.values(), reverse=True)
+    import_data_list = sorted(import_data_list, key=lambda x: x.values(), reverse=True)
+    optional_header_list = sorted(optional_header_list, key=lambda x: x.values(), reverse=True)
+    rsrc_list = sorted(rsrc_list, key=lambda x: x.values(), reverse=True)
 
+    print(top_imphash_list)
     print(top_words_list)
+    print(dos_header_list)
+    print(section_header_list)
+    print(import_data_list)
+    print(optional_header_list)
+    print(rsrc_list)
     return files
 
 
+def get_top_header(header, total_header_list): #TODO ADD IN CHECKING TO ENSURE 0's dont enter into the equation
+    if len(header) > 0 and header is not None:
+        exists = False
+    for each in header: # Can generify this and imphash further
+        jString = json.dumps(each)
+        if len(total_header_list) > 0:
+            for dict_item in total_header_list:
+                for key in dict_item:
+                    if jString == key:
+                        dict_item[key] += 1
+                        exists = True
+                if not exists:
+                    total_header_list.append({jString: 1})
+                    break
+
+        elif len(total_header_list) == 0:
+            total_header_list.append({jString: 1})
+
+    return total_header_list
+
+
+
+
 # Passes in an attribute from FileData and FileData+1
-def get_top_imphash(imphash, dict_list):
+def get_top_imphash(imphash, dict_list): # COULD INCORPORATE AN AVERAGE INTO EACH OF THESE?
     if len(imphash) > 0 and imphash is not None:
         exists = False
 
